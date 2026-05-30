@@ -927,7 +927,7 @@ jobs:
         if: matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         run: |-
           mkdir -p dist/Payload
-          cp -r clients/apple/build/SFI.xcarchive/Products/Applications/SFI.app dist/Payload/
+          cp -r clients/apple/build/SFI.xcarchive/Products/Applications/sing-box.app dist/Payload/
           cd dist && zip -r sing-box-unsigned.ipa Payload/
       - name: Upload to App Store Connect
         if: false # matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
