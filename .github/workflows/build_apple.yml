@@ -907,8 +907,8 @@ jobs:
         if: matrix.if && matrix.name != 'iOS'
         run: |-
           go run -v ./cmd/internal/update_apple_version --ci
-      - name: Build
-        if: matrix.if
+      - name: Build iOS
+        if: matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         run: |-
           cd clients/apple
           xcodebuild archive \
@@ -916,6 +916,23 @@ jobs:
             -configuration Release \
             -destination "${{ matrix.destination }}" \
             -archivePath "${{ matrix.archive }}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" 
+            # -allowProvisioningUpdates \
+            # -authenticationKeyPath $ASC_KEY_PATH \
+            # -authenticationKeyID $ASC_KEY_ID \
+            # -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
+      - name: Build macOS-standalone
+        if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
+        run: |-
+          cd clients/apple
+          xcodebuild archive \
+            -scheme "${{ matrix.scheme }}" \
+            -configuration Release \
+            -destination "${{ matrix.destination }}" \
+            -archivePath "${{ matrix.archive }}" \
+            -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" 
