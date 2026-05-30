@@ -512,7 +512,7 @@ jobs:
           CGO_ENABLED: "1"
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
-          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.legacy_osx && '10.13' || '' }}
+          MACOSX_DEPLOYMENT_TARGET: ${{ matrix.legacy_osx && '10.13' || '12.0' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Set name
         run: |-
@@ -933,6 +933,7 @@ jobs:
             -destination "${{ matrix.destination }}" \
             -archivePath "${{ matrix.archive }}" \
             -skipPackagePluginValidation \
+            MACOSX_DEPLOYMENT_TARGET=12.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" 
@@ -970,7 +971,7 @@ jobs:
         run: |-
           go run -v ./cmd/internal/app_store_connect publish_testflight ${{ matrix.platform }}
       - name: Build image
-        if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
+        if: false # matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         run: |-
           pushd clients/apple
           xcodebuild -exportArchive \
@@ -994,6 +995,75 @@ jobs:
           mkdir -p dist
           cp clients/apple/SFM.dmg "dist/SFM-${VERSION}-universal.dmg"
           cp "clients/apple/${{ matrix.archive }}/SFM.dSYMs.zip" "dist/SFM-${VERSION}-universal.dSYMs.zip"
+      - name: Build unsigned image
+        if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
+        run: |-
+          pushd clients/apple
+          
+          # 1. 【核心修复】创建导出目录，并直接用 cp 强行提取免签的 .app 文件，绕过 xcodebuild 检查
+          mkdir -p "${{ matrix.export_path }}"
+          cp -r "${{ matrix.archive }}/Products/Applications/"*.app "${{ matrix.export_path }}/SFM.app"
+          
+          # 2. 安装打包工具
+          brew install create-dmg
+          
+          # 3. 开始打包成 DMG
+          create-dmg \
+          	--volname "sing-box" \
+          	--volicon "${{ matrix.export_path }}/SFM.app/Contents/Resources/AppIcon.icns" \
+          	--icon "SFM.app" 0 0 \
+          		--hide-extension "SFM.app" \
+          		--app-drop-link 0 0 \
+          		--skip-jenkins \
+          	SFM.dmg "${{ matrix.export_path }}/SFM.app"
+          
+          # 4. 彻底移除了原本会报错的 xcrun notarytool submit 公证步骤
+          
+          cd "${{ matrix.archive }}"
+          zip -r SFM.dSYMs.zip dSYMs
+          popd
+
+          mkdir -p dist
+          cp clients/apple/SFM.dmg "dist/SFM-${VERSION}-universal-unsigned.dmg"
+          cp "clients/apple/${{ matrix.archive }}/SFM.dSYMs.zip" "dist/SFM-${VERSION}-universal.dSYMs-unsigned.zip"    
+      - name: Ad-Hoc sign
+        if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
+        run: |-
+          pushd clients/apple
+        
+          # 1. 强行提取免签的 .app 文件
+          #  mkdir -p "${{ matrix.export_path }}"
+          cp -rf "${{ matrix.archive }}/Products/Applications/"*.app "${{ matrix.export_path }}/SFM.app"
+          
+          # 【强力推荐加入：Ad-Hoc 本地自签名，防止 M 芯片 Mac 闪退】
+          echo "==== Ad-Hoc Signing SFM.app ===="
+          codesign --force --deep --sign - "${{ matrix.export_path }}/SFM.app"
+
+          # 必须删掉第一步生成的同名 SFM.dmg，否则 create-dmg 会报文件已存在而引发错误
+          rm -f SFM.dmg
+          
+          # 2. 安装打包工具
+          brew install create-dmg
+          
+          # 3. 开始打包成 DMG
+          create-dmg \
+          	--volname "sing-box" \
+          	--volicon "${{ matrix.export_path }}/SFM.app/Contents/Resources/AppIcon.icns" \
+          	--icon "SFM.app" 0 0 \
+          		--hide-extension "SFM.app" \
+          		--app-drop-link 0 0 \
+          		--skip-jenkins \
+          	SFM.dmg "${{ matrix.export_path }}/SFM.app"
+          
+          # 4. 彻底移除了原本会报错的 xcrun notarytool submit 公证步骤
+          
+          cd "${{ matrix.archive }}"
+          zip -r SFM.dSYMs.zip dSYMs
+          popd
+
+          mkdir -p dist
+          cp clients/apple/SFM.dmg "dist/SFM-${VERSION}-universal.dmg"
+          cp "clients/apple/${{ matrix.archive }}/SFM.dSYMs.zip" "dist/SFM-${VERSION}-universal.dSYMs.zip"    
       - name: Upload image
         if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
