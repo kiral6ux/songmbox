@@ -934,7 +934,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: bin-ios-unsigned
-          path: dist/SFI-${VERSION}-unsigned.ipa
+          path: "dist/*.ipa"
           if-no-files-found: error
       - name: Upload to App Store Connect
         if: false # matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
