@@ -852,7 +852,7 @@ jobs:
           cd clients/apple
           git checkout dev
       - name: Setup certificates
-        if: matrix.if
+        if: false #matrix.if
         run: |-
           CERTIFICATE_PATH=$RUNNER_TEMP/Certificates.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/certificates.keychain-db
@@ -916,12 +916,21 @@ jobs:
             -configuration Release \
             -destination "${{ matrix.destination }}" \
             -archivePath "${{ matrix.archive }}" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath $ASC_KEY_PATH \
-            -authenticationKeyID $ASC_KEY_ID \
-            -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
-      - name: Upload to App Store Connect
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" 
+            # -allowProvisioningUpdates \
+            # -authenticationKeyPath $ASC_KEY_PATH \
+            # -authenticationKeyID $ASC_KEY_ID \
+            # -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
+      - name: Make Unsigned IPA
         if: matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
+        run: |-
+          mkdir -p dist/Payload
+          cp -r clients/apple/build/SFI.xcarchive/Products/Applications/SFI.app dist/Payload/
+          cd dist && zip -r sing-box-unsigned.ipa Payload/
+      - name: Upload to App Store Connect
+        if: false # matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         run: |-
           go run -v ./cmd/internal/app_store_connect cancel_app_store ${{ matrix.platform }}
           cd clients/apple
@@ -933,7 +942,7 @@ jobs:
             -authenticationKeyID $ASC_KEY_ID \
             -authenticationKeyIssuerID $ASC_KEY_ISSUER_ID
       - name: Publish to TestFlight
-        if: matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch' && github.ref =='refs/heads/testing'
+        if: false # matrix.if && matrix.name != 'macOS-standalone' && github.event_name == 'workflow_dispatch' && github.ref =='refs/heads/testing'
         run: |-
           go run -v ./cmd/internal/app_store_connect publish_testflight ${{ matrix.platform }}
       - name: Build image
@@ -1021,3 +1030,10 @@ jobs:
           ghr --replace -p 5 "v${VERSION}" dist
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Unsigned IPA
+        if: matrix.if && matrix.name == 'iOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sing-box-unsigned-ipa
+          path: dist/sing-box-unsigned.ipa
+
