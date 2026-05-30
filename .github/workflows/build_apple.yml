@@ -933,6 +933,7 @@ jobs:
             -destination "${{ matrix.destination }}" \
             -archivePath "${{ matrix.archive }}" \
             -skipPackagePluginValidation \
+            MACOSX_DEPLOYMENT_TARGET='12.0' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" 
@@ -1031,7 +1032,8 @@ jobs:
           pushd clients/apple
         
           # 1. 强行提取免签的 .app 文件
-          #  mkdir -p "${{ matrix.export_path }}"
+          rm -rf  "${{ matrix.export_path }}"
+          mkdir -p "${{ matrix.export_path }}"
           cp -rf "${{ matrix.archive }}/Products/Applications/"*.app "${{ matrix.export_path }}/SFM.app"
           
           # 【强力推荐加入：Ad-Hoc 本地自签名，防止 M 芯片 Mac 闪退】
